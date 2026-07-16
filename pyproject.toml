@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "coworking-booking"
+version = "1.0.0"
+description = "Сервис для бронирования переговорных комнат"
+authors = []
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "0.115.6"
+uvicorn = {version = "0.34.0", extras = ["standard"]}
+sqlalchemy = "2.0.36"
+psycopg2-binary = "2.9.10"
+python-jose = {version = "3.3.0", extras = ["cryptography"]}
+passlib = {version = "1.7.4", extras = ["bcrypt"]}
+python-dotenv = "1.0.1"
+pydantic = "2.10.4"
+bcrypt = "4.0.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+httpx = "^0.28.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
