@@ -1,0 +1,37 @@
+[MAIN]
+# pylintrc для проекта коворкинг-бронирования
+
+# Игнорировать виртуальное окружение и кэш
+ignore=.venv,__pycache__
+
+# Использовать несколько потоков для ускорения
+jobs=1
+
+[MESSAGES CONTROL]
+# Глобальные отключения: импорты, которые pylint не может резолвить без PYTHONPATH;
+# too-few-public-methods — нормально для Pydantic-схем и SQLAlchemy-моделей;
+# redefined-outer-name — стандартный паттерн pytest (фикстуры ссылаются друг на друга)
+disable=
+    import-error,
+    too-few-public-methods,
+    missing-module-docstring,
+    redefined-outer-name
+
+[BASIC]
+# Константы: UPPER_CASE и snake_case (для экземпляров типа sessionmaker, TestClient)
+const-rgx=^[A-Z][A-Za-z0-9_]*$|^[a-z][a-z0-9_]*$
+
+[DESIGN]
+# Максимальное количество аргументов в функции
+max-args=7
+
+# Максимальное количество позиционных аргументов
+max-positional-arguments=7
+
+[FORMAT]
+# Максимальная длина строки
+max-line-length=120
+
+[VARIABLES]
+# Разрешить неиспользуемые аргументы, начинающиеся с _
+dummy-variables-rgx=_+$|dummy

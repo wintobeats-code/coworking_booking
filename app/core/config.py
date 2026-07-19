@@ -1,16 +1,17 @@
-import os
+"""Настройки приложения."""
 
-from dotenv import load_dotenv
-
-load_dotenv()
+from pydantic_settings import BaseSettings
 
 
-class Settings:
-    SECRET_KEY: str = os.getenv("SECRET_KEY", "super-secret-key-change-in-prod")
-    ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
-        os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
-    )
+class Settings(BaseSettings):
+    """Настройки, загружаемые из переменных окружения или .env."""
+
+    SECRET_KEY: str = "super-secret-key-change-in-prod"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    DATABASE_URL: str = "postgresql://coworking:coworking123@localhost:5432/coworking"
+
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
 settings = Settings()

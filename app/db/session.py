@@ -1,20 +1,17 @@
-import os
+"""Подключение к базе данных и сессия SQLAlchemy."""
 
-from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-load_dotenv()
+from app.core.config import settings
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-engine = create_engine(DATABASE_URL)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+ENGINE = create_engine(settings.DATABASE_URL)
+SESSION_LOCAL = sessionmaker(autocommit=False, autoflush=False, bind=ENGINE)
 
 
 def get_db():
-    db = SessionLocal()
+    """Генератор сессии БД для FastAPI Depends."""
+    db = SESSION_LOCAL()
     try:
         yield db
     finally:

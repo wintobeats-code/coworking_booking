@@ -1,11 +1,11 @@
-from datetime import date
+"""Роутер бронирований."""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
-from app.db.models import User
 from app.core.dependencies import get_current_user
+from app.db.models import User
+from app.db.session import get_db
 from app.schemas.booking import BookingCreate, BookingOut
 from app.services import booking as booking_service
 
@@ -18,13 +18,13 @@ def create_booking(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Создаёт бронирование слота."""
     booking = booking_service.create_booking(
         db=db,
         slot_id=data.slot_id,
         booking_date=data.booking_date,
         user=current_user,
     )
-    # Форматируем ответ через схему
     return BookingOut(
         id=booking.id,
         user_id=booking.user_id,
@@ -41,6 +41,7 @@ def my_bookings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Возвращает список бронирований текущего пользователя."""
     return booking_service.get_my_bookings(db, current_user)
 
 
@@ -50,4 +51,5 @@ def cancel_booking(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Отменяет бронирование по идентификатору."""
     booking_service.cancel_booking(db, booking_id, current_user)

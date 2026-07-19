@@ -1,17 +1,25 @@
 """Тесты эндпоинтов /rooms."""
 
+from datetime import date
+
+from app.db.models import Booking
+
 
 class TestListRooms:
+    """Проверки GET /rooms."""
+
     def test_list_rooms_empty(self, client, employee_token):
+        """Пустой список при отсутствии комнат."""
         response = client.get(
             "/rooms", headers={"Authorization": f"Bearer {employee_token}"}
         )
         assert response.status_code == 200
         assert response.json() == []
 
-    def test_list_rooms_returns_rooms(
+    def test_list_rooms_returns_rooms(  # pylint: disable=unused-argument
         self, client, employee_token, sample_room, second_room
     ):
+        """Возвращает все созданные комнаты."""
         response = client.get(
             "/rooms", headers={"Authorization": f"Bearer {employee_token}"}
         )
@@ -22,14 +30,18 @@ class TestListRooms:
         assert names == {"Переговорка А", "Переговорка Б"}
 
     def test_list_rooms_unauthorized(self, client):
+        """Без токена возвращает 401."""
         response = client.get("/rooms")
         assert response.status_code == 401
 
 
 class TestRoomsAvailability:
-    def test_availability_with_slots(
+    """Проверки GET /rooms/availability."""
+
+    def test_availability_with_slots(  # pylint: disable=unused-argument
         self, client, employee_token, sample_room, sample_slot, sample_slot_2
     ):
+        """Свободные слоты отображаются корректно."""
         response = client.get(
             "/rooms/availability",
             params={"date": "2026-07-20"},
@@ -41,10 +53,9 @@ class TestRoomsAvailability:
         room = data[0]
         assert room["name"] == "Переговорка А"
         assert len(room["slots"]) == 2
-        # Оба слота свободны
         assert all(s["is_booked"] is False for s in room["slots"])
 
-    def test_availability_slot_booked(
+    def test_availability_slot_booked(  # pylint: disable=unused-argument
         self,
         client,
         employee_token,
@@ -54,11 +65,7 @@ class TestRoomsAvailability:
         sample_slot_2,
         db_session,
     ):
-        from datetime import date
-
-        from app.db.models import Booking
-
-        # Бронируем первый слот напрямую в БД
+        """Забронированный слот помечается is_booked=True."""
         db_session.add(
             Booking(
                 user_id=user_employee.id,
@@ -81,7 +88,7 @@ class TestRoomsAvailability:
         assert len(booked) == 1
         assert len(free) == 1
 
-    def test_availability_no_bookings_on_date(
+    def test_availability_no_bookings_on_date(  # pylint: disable=unused-argument
         self,
         client,
         employee_token,
@@ -90,11 +97,7 @@ class TestRoomsAvailability:
         sample_slot,
         db_session,
     ):
-        from datetime import date
-
-        from app.db.models import Booking
-
-        # Бронь на другой день
+        """Бронь на другой день не влияет на доступность."""
         db_session.add(
             Booking(
                 user_id=user_employee.id,
@@ -114,10 +117,12 @@ class TestRoomsAvailability:
         assert all(s["is_booked"] is False for s in slots)
 
     def test_availability_unauthorized(self, client):
+        """Без токена доступность возвращает 401."""
         response = client.get("/rooms/availability", params={"date": "2026-07-20"})
         assert response.status_code == 401
 
     def test_availability_missing_date_param(self, client, employee_token):
+        """Без параметра date возвращает 422."""
         response = client.get(
             "/rooms/availability",
             headers={"Authorization": f"Bearer {employee_token}"},

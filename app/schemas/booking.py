@@ -1,13 +1,20 @@
+"""Pydantic-схемы для бронирования."""
+
 from datetime import date
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel
 
 
 class BookingCreate(BaseModel):
+    """Схема создания бронирования."""
+
     slot_id: int
     booking_date: date
 
 
 class BookingOut(BaseModel):
+    """Схема ответа с информацией о бронировании."""
+
     id: int
     user_id: int
     slot_id: int

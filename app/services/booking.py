@@ -1,20 +1,22 @@
+"""Сервис бронирования: создание, просмотр, отмена броней."""
+
 from datetime import date
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.db.models import Booking, User, Slot, Room, UserRole
+from app.db.models import Booking, Room, Slot, User, UserRole
 
 
-def create_booking(db: Session, slot_id: int, booking_date: date, user: User) -> Booking:
+def create_booking(
+    db: Session, slot_id: int, booking_date: date, user: User
+) -> Booking:
     """Создаёт бронь. Любой авторизованный юзер может бронировать."""
-    # 1. Проверяем, что слот существует
     slot = db.query(Slot).filter(Slot.id == slot_id).first()
     if not slot:
         raise HTTPException(status_code=404, detail="Слот не найден")
 
-    # 2. Создаём бронь
     booking = Booking(
         user_id=user.id,
         slot_id=slot_id,
@@ -24,26 +26,21 @@ def create_booking(db: Session, slot_id: int, booking_date: date, user: User) ->
 
     try:
         db.commit()
-    except IntegrityError:
-        # Сработал UniqueConstraint(slot_id, booking_date) — слот уже занят
+    except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Этот слот на указанную дату уже забронирован",
-        )
+        ) from exc
 
     db.refresh(booking)
     return booking
 
 
 def get_my_bookings(db: Session, user: User) -> list[dict]:
-    """Возвращает ТОЛЬКО мои бронирования (изоляция данных!)."""
+    """Возвращает только бронирования текущего пользователя."""
     bookings = (
-        db.query(Booking)
-        .join(Slot)
-        .join(Room)
-        .filter(Booking.user_id == user.id)
-        .all()
+        db.query(Booking).join(Slot).join(Room).filter(Booking.user_id == user.id).all()
     )
     return [
         {
@@ -60,11 +57,7 @@ def get_my_bookings(db: Session, user: User) -> list[dict]:
 
 
 def cancel_booking(db: Session, booking_id: int, current_user: User) -> None:
-    """
-    Отмена брони.
-    - Сотрудник может отменить ТОЛЬКО свою бронь.
-    - Админ может отменить ЛЮБУЮ бронь.
-    """
+    """Отмена брони. Сотрудник отменяет только свою, админ — любую."""
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Бронь не найдена")

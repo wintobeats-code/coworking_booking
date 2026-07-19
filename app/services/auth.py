@@ -1,8 +1,10 @@
+"""Сервис аутентификации пользователей."""
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.security import create_access_token, verify_password
 from app.db.models import User
-from app.core.security import verify_password, create_access_token
 
 
 def authenticate_user(db: Session, login: str, password: str) -> str:

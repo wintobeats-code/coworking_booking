@@ -1,51 +1,67 @@
+"""Конфигурация pytest: движок БД, фикстуры приложения и данных."""
+
+from datetime import time
+
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
 from app.core.security import hash_password
 from app.db.base import Base
 from app.db.models import Room, Slot, User, UserRole
 from app.db.session import get_db
-from app.main import app
+from app.main import create_app
 
-# ---------- Фикстуры БД ----------
+SQLALCHEMY_DATABASE_URL = "sqlite:///file::memory:?cache=shared&uri=true"
 
-SQLALCHEMY_DATABASE_URL = "sqlite://"
-
-engine = create_engine(
+ENGINE = create_engine(
     SQLALCHEMY_DATABASE_URL,
     connect_args={"check_same_thread": False},
 )
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+@event.listens_for(ENGINE, "connect")
+def set_sqlite_pragma(dbapi_connection, _connection_record):
+    """Включает foreign keys в SQLite."""
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
+TESTING_SESSION_LOCAL = sessionmaker(autocommit=False, autoflush=False, bind=ENGINE)
+
+Base.metadata.create_all(bind=ENGINE)
+
+TEST_APP = create_app(include_lifespan=False)
 
 
 def override_get_db():
-    db = TestingSessionLocal()
+    """Подменяет get_db на тестовую сессию."""
+    db = TESTING_SESSION_LOCAL()
     try:
         yield db
     finally:
         db.close()
 
 
-app.dependency_overrides[get_db] = override_get_db
+TEST_APP.dependency_overrides[get_db] = override_get_db
 
 
 @pytest.fixture(autouse=True)
-def prepare_db():
-    """Создаёт таблицы перед каждым тестом и дропает после."""
-    Base.metadata.create_all(bind=engine)
+def _clean_tables():
+    """Очищает все таблицы перед каждым тестом, сохраняя схему."""
+    with ENGINE.connect() as conn:
+        for table in reversed(Base.metadata.sorted_tables):
+            conn.execute(table.delete())
+        conn.commit()
     yield
-    Base.metadata.drop_all(bind=engine)
-
-
-# ---------- Фикстуры данных ----------
 
 
 @pytest.fixture
 def db_session():
-    """Сессия БД для прямых проверок в тестах."""
-    db = TestingSessionLocal()
+    """Сессия БД для создания тестовых данных и прямых проверок."""
+    db = TESTING_SESSION_LOCAL()
     try:
         yield db
     finally:
@@ -54,6 +70,7 @@ def db_session():
 
 @pytest.fixture
 def user_employee(db_session) -> User:
+    """Создаёт тестового сотрудника."""
     user = User(
         login="employee",
         hashed_password=hash_password("emp123"),
@@ -67,6 +84,7 @@ def user_employee(db_session) -> User:
 
 @pytest.fixture
 def user_admin(db_session) -> User:
+    """Создаёт тестового администратора."""
     user = User(
         login="admin",
         hashed_password=hash_password("admin123"),
@@ -79,7 +97,22 @@ def user_admin(db_session) -> User:
 
 
 @pytest.fixture
+def user_employee_2(db_session) -> User:
+    """Создаёт второго тестового сотрудника."""
+    user = User(
+        login="employee2",
+        hashed_password=hash_password("emp223"),
+        role=UserRole.EMPLOYEE,
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+@pytest.fixture
 def sample_room(db_session) -> Room:
+    """Создаёт тестовую комнату «Переговорка А»."""
     room = Room(name="Переговорка А")
     db_session.add(room)
     db_session.commit()
@@ -89,8 +122,7 @@ def sample_room(db_session) -> Room:
 
 @pytest.fixture
 def sample_slot(db_session, sample_room) -> Slot:
-    from datetime import time
-
+    """Создаёт тестовый слот 09:00–11:00."""
     slot = Slot(
         room_id=sample_room.id,
         start_time=time(9, 0),
@@ -104,8 +136,7 @@ def sample_slot(db_session, sample_room) -> Slot:
 
 @pytest.fixture
 def sample_slot_2(db_session, sample_room) -> Slot:
-    from datetime import time
-
+    """Создаёт тестовый слот 11:00–13:00."""
     slot = Slot(
         room_id=sample_room.id,
         start_time=time(11, 0),
@@ -119,6 +150,7 @@ def sample_slot_2(db_session, sample_room) -> Slot:
 
 @pytest.fixture
 def second_room(db_session) -> Room:
+    """Создаёт тестовую комнату «Переговорка Б»."""
     room = Room(name="Переговорка Б")
     db_session.add(room)
     db_session.commit()
@@ -126,16 +158,15 @@ def second_room(db_session) -> Room:
     return room
 
 
-# ---------- Клиент и авторизация ----------
-
-
 @pytest.fixture
 def client() -> TestClient:
-    return TestClient(app)
+    """HTTP-клиент для тестов API."""
+    return TestClient(TEST_APP, raise_server_exceptions=True)
 
 
 @pytest.fixture
-def employee_token(client, user_employee) -> str:
+def employee_token(client, user_employee) -> str:  # pylint: disable=unused-argument
+    """JWT-токен сотрудника (зависит от user_employee для создания пользователя)."""
     response = client.post(
         "/auth/login",
         json={"login": "employee", "password": "emp123"},
@@ -144,7 +175,8 @@ def employee_token(client, user_employee) -> str:
 
 
 @pytest.fixture
-def admin_token(client, user_admin) -> str:
+def admin_token(client, user_admin) -> str:  # pylint: disable=unused-argument
+    """JWT-токен администратора (зависит от user_admin для создания пользователя)."""
     response = client.post(
         "/auth/login",
         json={"login": "admin", "password": "admin123"},
@@ -152,5 +184,11 @@ def admin_token(client, user_admin) -> str:
     return response.json()["access_token"]
 
 
-def auth_headers(token: str) -> dict:
-    return {"Authorization": f"Bearer {token}"}
+@pytest.fixture
+def employee_2_token(client, user_employee_2) -> str:  # pylint: disable=unused-argument
+    """JWT-токен второго сотрудника (зависит от user_employee_2 для создания пользователя)."""
+    response = client.post(
+        "/auth/login",
+        json={"login": "employee2", "password": "emp223"},
+    )
+    return response.json()["access_token"]
