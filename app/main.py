@@ -3,6 +3,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 
 from app.api import auth, bookings, rooms
 from app.core.seed import seed_initial_data
@@ -28,6 +29,11 @@ def create_app(include_lifespan: bool = True) -> FastAPI:
         version="1.0.0",
         lifespan=lifespan_func,
     )
+
+    @application.get("/", include_in_schema=False)
+    def redirect_to_docs():
+        """Перенаправляет корневой URL на Swagger-документацию."""
+        return RedirectResponse(url="/docs")
 
     application.include_router(auth.router, prefix="/auth", tags=["auth"])
     application.include_router(rooms.router, prefix="/rooms", tags=["rooms"])
